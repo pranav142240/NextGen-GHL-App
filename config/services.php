@@ -34,13 +34,16 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-        
+
     'ghl' => [
         'client_id' => env('GHL_CLIENT_ID'),
         'client_secret' => env('GHL_CLIENT_SECRET'),
         'redirect_uri' => env('GHL_REDIRECT_URI'),
         'scopes' => env('GHL_SCOPES'),
         'marketplace_url' => env('GHL_MARKETPLACE_URL'),
+        'ghl_api_base_url' => env('GHL_API_BASE_URL', 'https://services.leadconnectorhq.com'),
+        'ghl_api_version' => env('GHL_API_VERSION', '2021-07-28'),
+
     ],
 
 ];

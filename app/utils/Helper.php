@@ -15,31 +15,76 @@ class Helper
      * @param  string $companyId
      * @return string|null  Returns a valid access token, or null if failed
      */
-    public static function getValidAccessToken(string $companyId): ?string
+    // public static function getValidAccessToken(string $companyId): ?string
+    // {
+    //     $token = CompanyToken::where('company_id', $companyId)->first();
+
+    //     log::info("Checking token for company: {$companyId}", [
+    //         'token' => $token ? 'exists' : 'not found',
+    //     ]);
+
+    //     if (!$token) {
+    //         Log::warning("No token found for company: {$companyId}");
+    //         return null;
+    //     }
+
+    //     // If no expiry is set, assume token is valid
+    //     if (!$token->expires_at) {
+    //         return $token->access_token;
+    //     }
+
+    //     // If expired → try to refresh
+    //     if (Carbon::now()->isAfter(Carbon::parse($token->expires_at))) {
+    //         return self::refreshToken($companyId);
+    //     }
+
+    //     return $token->access_token;
+    // }
+
+    public static function getValidAccessToken($companyId)
     {
-        $token = CompanyToken::where('company_id', $companyId)->first();
+        // Grab the whole model row so we can read expires_at
+        $tokenRow = CompanyToken::where('company_id', $companyId)->first();
 
-        log::info("Checking token for company: {$companyId}", [
-            'token' => $token ? 'exists' : 'not found',
-        ]);
-
-        if (!$token) {
-            Log::warning("No token found for company: {$companyId}");
+        if (!$tokenRow) {
             return null;
         }
 
-        // If no expiry is set, assume token is valid
-        if (!$token->expires_at) {
-            return $token->access_token;
+        // ----- key change: pass the model, not the raw token string -----
+        if (self::isTokenExpired($tokenRow)) {
+            Log::info('Token expired, attempting refresh', ['company_id' => $companyId]);
+
+            $refreshed = self::refreshToken($companyId);
+
+            if ($refreshed) {
+                return $refreshed; // a fresh access-token string
+            }
+
+            Log::error('Failed to refresh expired token', ['company_id' => $companyId]);
+            return null;
         }
 
-        // If expired → try to refresh
-        if (Carbon::now()->isAfter(Carbon::parse($token->expires_at))) {
-            return self::refreshToken($companyId);
-        }
-
-        return $token->access_token;
+        return $tokenRow->access_token;
     }
+
+    /**
+     * Decide whether the access token is expired *using the expires_at column*.
+     * We subtract 5 minutes as a safety buffer exactly like before.
+     */
+    private static function isTokenExpired(CompanyToken $tokenRow): bool
+    {
+        try {
+            // Parse the timestamp in the same timezone you store it (UTC recommended)
+            $expiresAt = Carbon::parse($tokenRow->expires_at)->timezone('UTC');
+
+            // 5-minute buffer -> call isPast() after shifting back 5 minutes
+            return $expiresAt->subMinutes(5)->isPast();
+        } catch (\Throwable $e) {
+            Log::error('Error checking token expiry', ['error' => $e->getMessage()]);
+            return true;   // play safe
+        }
+    }
+
 
     /**
      * Refresh the OAuth token for the given company.
@@ -58,7 +103,7 @@ class Helper
             }
 
             $response = Http::asForm()->post(
-                'https://services.leadconnectorhq.com/oauth/token',
+                config('services.ghl.ghl_api_base_url') . '/oauth/token',
                 [
                     'client_id'     => config('services.ghl.client_id'),
                     'client_secret' => config('services.ghl.client_secret'),
@@ -94,6 +139,84 @@ class Helper
                 'error' => $e->getMessage(),
             ]);
             return null;
+        }
+    }
+
+    public static function toggleCompanyTokenStatus(string $companyId): bool
+    {
+        try {
+            $token = CompanyToken::where('company_id', $companyId)->first();
+
+            if (!$token) {
+                Log::warning("No token found for company: {$companyId}");
+                return false;
+            }
+
+            $token->active_status = !$token->active_status;
+            $saved = $token->save();
+
+            Log::info("Token status toggled for company: {$companyId}", [
+                'new_status' => $token->active_status ? 'active' : 'inactive'
+            ]);
+
+            return $saved;
+        } catch (\Throwable $e) {
+            Log::error("Failed to toggle token status for company: {$companyId}", [
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Deactivate a company token
+     *
+     * @param string $companyId
+     * @return bool
+     */
+    public static function deactivateCompanyToken(string $companyId): bool
+    {
+        try {
+            $token = CompanyToken::where('company_id', $companyId)->first();
+
+            if (!$token) {
+                Log::warning("No token found for company: {$companyId}");
+                return false;
+            }
+
+            $token->active_status = false;
+            $saved = $token->save();
+
+            Log::info("Token deactivated for company: {$companyId}");
+            return $saved;
+        } catch (\Throwable $e) {
+            Log::error("Failed to deactivate token for company: {$companyId}", [
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public static function activateCompanyToken(string $companyId): bool
+    {
+        try {
+            $token = CompanyToken::where('company_id', $companyId)->first();
+
+            if (!$token) {
+                Log::warning("No token found for company: {$companyId}");
+                return false;
+            }
+
+            $token->active_status = true;
+            $saved = $token->save();
+
+            Log::info("Token activated for company: {$companyId}");
+            return $saved;
+        } catch (\Throwable $e) {
+            Log::error("Failed to activate token for company: {$companyId}", [
+                'error' => $e->getMessage()
+            ]);
+            return false;
         }
     }
 }

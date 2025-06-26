@@ -23,9 +23,9 @@ class GhlController extends Controller
             $response = Http::withHeaders([
                 'Accept'        => 'application/json',
                 'Authorization' => "Bearer {$accessToken}",
-                'Version'       => '2021-07-28',
+                'Version'       => config('services.ghl.ghl_api_version'),
             ])
-                ->get('https://services.leadconnectorhq.com/locations/search', [
+                ->get(config('services.ghl.ghl_api_base_url').'/locations/search', [
                     'email' => $email,
                 ]);
 
@@ -67,9 +67,9 @@ class GhlController extends Controller
                 ->withHeaders([
                     'Accept'        => 'application/json',
                     'Authorization' => 'Bearer ' . $accessToken,
-                    'Version'       => '2021-07-28',
+                    'Version'       => config('services.ghl.ghl_api_version'),
                 ])
-                ->post('https://services.leadconnectorhq.com/oauth/locationToken', [
+                ->post(config('services.ghl.ghl_api_base_url') . '/oauth/locationToken', [
                     'companyId'  => $companyId,
                     'locationId' => $locationId,
                 ]);
@@ -108,12 +108,12 @@ class GhlController extends Controller
         string $locationId
     ): ?array {
         try {
-            $endpoint = "https://services.leadconnectorhq.com/locations/{$locationId}/customFields";
+            $endpoint = config('services.ghl.ghl_api_base_url')."/locations/{$locationId}/customFields";
 
             $response = Http::withHeaders([
                 'Accept'        => 'application/json',
                 'Authorization' => 'Bearer ' . $locationAccessToken,
-                'Version'       => '2021-07-28',
+                'Version'       => config('services.ghl.ghl_api_version'),
             ])
                 ->get($endpoint);
 
@@ -150,7 +150,7 @@ class GhlController extends Controller
         string $dataType = 'TEXT'
     ): ?array {
         try {
-            $endpoint = "https://services.leadconnectorhq.com/locations/{$locationId}/customFields";
+            $endpoint = config('services.ghl.ghl_api_base_url')."/locations/{$locationId}/customFields";
 
             $payload = [
                 'name'            => $fieldName,
@@ -170,7 +170,7 @@ class GhlController extends Controller
                 'Accept'        => 'application/json',
                 'Authorization' => 'Bearer ' . $locationAccessToken,
                 'Content-Type'  => 'application/json',
-                'Version'       => '2021-07-28',
+                'Version'       => config('services.ghl.ghl_api_version'),
             ])
                 ->post($endpoint, $payload);
 
@@ -223,17 +223,15 @@ class GhlController extends Controller
 
         // Ensure the required locationId is present in the payload
         $payload = array_merge(['locationId' => $locationId], $contactData);
-        Log::info('Upserting contact', [
-            'payload'    => $payload,
-        ]);
+
         try {
             $response = Http::withHeaders([
                 'Accept'        => 'application/json',
                 'Content-Type'  => 'application/json',
                 'Authorization' => 'Bearer ' . $locationAccessToken,
-                'Version'       => '2021-07-28',
+                'Version'       => config('services.ghl.ghl_api_version'),
             ])
-                ->post('https://services.leadconnectorhq.com/contacts/upsert', $payload);
+                ->post(config('services.ghl.ghl_api_base_url').'/contacts/upsert', $payload);
 
             if ($response->failed()) {
                 Log::error('Failed to upsert contact', [
