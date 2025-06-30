@@ -9,37 +9,6 @@ use Illuminate\Support\Facades\Log;
 
 class Helper
 {
-    /**
-     * Check if the token is expired for a company, and refresh if needed.
-     *
-     * @param  string $companyId
-     * @return string|null  Returns a valid access token, or null if failed
-     */
-    // public static function getValidAccessToken(string $companyId): ?string
-    // {
-    //     $token = CompanyToken::where('company_id', $companyId)->first();
-
-    //     log::info("Checking token for company: {$companyId}", [
-    //         'token' => $token ? 'exists' : 'not found',
-    //     ]);
-
-    //     if (!$token) {
-    //         Log::warning("No token found for company: {$companyId}");
-    //         return null;
-    //     }
-
-    //     // If no expiry is set, assume token is valid
-    //     if (!$token->expires_at) {
-    //         return $token->access_token;
-    //     }
-
-    //     // If expired → try to refresh
-    //     if (Carbon::now()->isAfter(Carbon::parse($token->expires_at))) {
-    //         return self::refreshToken($companyId);
-    //     }
-
-    //     return $token->access_token;
-    // }
 
     public static function getValidAccessToken($companyId)
     {
@@ -57,7 +26,7 @@ class Helper
             $refreshed = self::refreshToken($companyId);
 
             if ($refreshed) {
-                return $refreshed; // a fresh access-token string
+                return $refreshed;
             }
 
             Log::error('Failed to refresh expired token', ['company_id' => $companyId]);
@@ -74,14 +43,14 @@ class Helper
     private static function isTokenExpired(CompanyToken $tokenRow): bool
     {
         try {
-            // Parse the timestamp in the same timezone you store it (UTC recommended)
+
             $expiresAt = Carbon::parse($tokenRow->expires_at)->timezone('UTC');
 
             // 5-minute buffer -> call isPast() after shifting back 5 minutes
             return $expiresAt->subMinutes(5)->isPast();
         } catch (\Throwable $e) {
             Log::error('Error checking token expiry', ['error' => $e->getMessage()]);
-            return true;   // play safe
+            return true;   
         }
     }
 
